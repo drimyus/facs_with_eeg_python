@@ -42,8 +42,9 @@ class StandAlone:
         self.face_width = 151
         self.face_height = 151
 
+        self.labels = ["angry", "contemp", "disgust", "fear", "happy", "neutral", "sadness", "suprise"]
         self.rect_color = (0, 255, 0)
-        self.text_color = (255, 255, 0)
+        self.text_color = (255, 0, 255)
 
         # load the model
         sys.stdout.write("Loading the model.\n")
@@ -193,7 +194,7 @@ class StandAlone:
         calib_image = None
 
         if len(rects) == 0:
-            calib_image = self.calib_orientation(image)
+            _, calib_image = self.calib_orientation(image)
         else:
             calib_image = image
 
@@ -314,7 +315,9 @@ class StandAlone:
         """-----------------------------------------------------------------------------------------"""
         sys.stdout.write("\nConfigure the SVM model.\n")
         # Configure the model : linear SVM model with probability capabilities
-        model = SVC(C=1.0, kernel='linear', degree=3, gamma='auto', coef0=0.0, shrinking=True, probability=True,
+        """'linear', 'poly', 'rbf', 'sigmoid', 'precomputed' or  a callable."""
+
+        model = SVC(C=1.0, kernel='poly', degree=3, gamma='auto', coef0=0.0, shrinking=True, probability=True,
                     tol=0.001, cache_size=200, class_weight='balanced', verbose=False, max_iter=-1,
                     decision_function_shape='ovr', random_state=None)
         # model = SVC(C=1.0, kernel='linear')
@@ -442,6 +445,71 @@ class StandAlone:
         except Exception as e:
             sys.stdout.write(str(e) + "\n")
 
+    def live_video(self, video_path):
+        cap = cv2.VideoCapture(video_path)
+
+        width = cap.get(cv2.CAP_PROP_FRAME_WIDTH)
+        height = cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
+
+
+
+        ret, frame = cap.read()
+        while ret:
+            ret, frame = cap.read()
+
+            frame = cv2.resize(frame, (int(width/2.5), int(height/2.5)))
+
+            rects = self.dlib_face.detect_face(frame)
+
+            for rect in rects:
+                crop = frame[max(0, rect.top()): max(frame.shape[0], rect.bottom()),
+                             max(rect.left(), 0):min(rect.right(), frame.shape[1])]
+                if self.stand_flag:
+                    stand_face = self.standardize_face(crop)
+                else:
+                    stand_face = crop
+
+                resize = cv2.resize(stand_face, (self.face_width, self.face_height))
+
+                description = self.dlib_face.recog_description(resize)
+
+                fid, idx, probs = self.classify_description(description)
+
+                frame = self.show_result(frame, rect, probs)
+
+            cv2.imshow("frame", frame)
+
+            cur_pos = cap.get(cv2.CAP_PROP_POS_FRAMES)
+            cap.set(cv2.CAP_PROP_POS_FRAMES, cur_pos + 250)
+
+            key = cv2.waitKey(5000)
+            if key == ord('q'):
+                break
+            elif key == ord('n'):
+                cur_pos = cap.get(cv2.CAP_PROP_POS_FRAMES)
+                cap.set(cv2.CAP_PROP_POS_FRAMES, cur_pos + 500)
+
+        cap.release()
+        cv2.destroyAllWindows()
+
+    def show_result(self, image, rect, probs):
+
+        cv2.rectangle(image, (rect.left(), rect.top()), (rect.right(), rect.bottom()), self.rect_color, 1)
+        cv2.circle(image, (rect.left(), rect.top()), 1, self.rect_color, -1)
+        cv2.circle(image, (rect.left(), rect.bottom()), 1, self.rect_color, -1)
+        cv2.circle(image, (rect.right(), rect.top()), 1, self.rect_color, -1)
+        cv2.circle(image, (rect.right(), rect.bottom()), 1, self.rect_color, -1)
+
+        sum = 0.0
+        for i in range(len(probs[0])):
+            cv2.putText(image, "{:}:{:1.2f}".format(self.labels[i], probs[0][i]), (0, 10 + 20 * i),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, self.text_color, 2)
+            cv2.line(image, (100, 10 + 20 * i), (int(100 + probs[0][i] * 200), 10 + 20 * i), self.text_color, 3)
+            sum += probs[0][i]
+
+        print sum
+        return image
+
 
 if __name__ == '__main__':
 
@@ -454,8 +522,11 @@ if __name__ == '__main__':
     # st.ensemble_data()
     # st.train_model()
 
-    check_dataset = "../dataset/train"
-    st.check_precision(check_dataset)
+    # check_dataset = "../dataset/test";
+    # st.check_precision(check_dataset)
+    #
     # st.test_image_file()
+
+    st.live_video("../data/THE FINAL MANUP 20171080P.mp4")
 
 
