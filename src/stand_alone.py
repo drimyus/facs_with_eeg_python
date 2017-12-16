@@ -10,10 +10,7 @@ import os
 import random
 from PIL import Image, ExifTags
 
-if sys.version_info[0] == 3:  # python 3x
-    from src.face import Face
-elif sys.version_info[0] == 2:  # python 2x
-    from face import Face
+from src.face import Face
 
 
 FACE_DATASET = "crop"
@@ -22,7 +19,7 @@ TEST_DATASET = "test"
 
 
 class StandAlone:
-    def __init__(self, dataset, model_path, stand_flag=True):
+    def __init__(self, dataset, model_path, stand_flag=False):
 
         # location of classifier model
         self.model = None
@@ -97,8 +94,7 @@ class StandAlone:
             cv_img = cv2.imread(file_path)
             return cv_img
 
-    def calib_orie(self, image):
-
+    def calib_orientation(self, image):
         face = self.dlib_face
 
         max_rects = []
@@ -126,7 +122,7 @@ class StandAlone:
         sys.stdout.write("Ensembiling the data.\n")
 
         if not os.path.isdir(crop_dataset):
-            sys.stderr.write("\tNo exist such director: {}\n".format(crop_dataset))
+            sys.stderr.write("\tNo exist such directory: {}\n".format(crop_dataset))
             sys.exit(1)
         sys.stdout.write("\tdataset: {}\n".format(crop_dataset))
 
@@ -146,7 +142,7 @@ class StandAlone:
             break
 
         """ ensembling """
-        sys.stdout.write("\tBalace the dataset.\n")
+        sys.stdout.write("\tBalance the dataset.\n")
         min_cnt = min(cnts)
 
         for person in persons:
@@ -181,14 +177,9 @@ class StandAlone:
         sys.stdout.write("\nEnsembled!\n")
 
     def standardize_face(self, face):
-
         gray = cv2.cvtColor(face, cv2.COLOR_BGR2GRAY)
         clahe_image = self.clahe.apply(gray)
-
         stand = cv2.cvtColor(clahe_image, cv2.COLOR_GRAY2BGR)
-
-        stand = cv2.resize(stand, (self.face_width, self.face_height))
-
         return stand
 
     def image_descriptions(self, image, face):
@@ -202,35 +193,35 @@ class StandAlone:
         calib_image = None
 
         if len(rects) == 0:
-            calib_image = self.calib_orie(image)
+            calib_image = self.calib_orientation(image)
         else:
             calib_image = image
 
         for rect in rects:
             crop = calib_image[max(0, rect.top()): max(image.shape[0], rect.bottom()),
                                max(rect.left(), 0):min(rect.right(), image.shape[1])]
-
             if self.stand_flag:
                 stand_face = self.standardize_face(crop)
             else:
                 stand_face = crop
 
-            description = self.dlib_face.recog_description(stand_face)
+            resize = cv2.resize(stand_face, (self.face_width, self.face_height))
+
+            description = self.dlib_face.recog_description(resize)
             descriptions.append(description)
 
         return calib_image, descriptions, rects
 
     def train_data(self, raw_data):
-
         dataset = self.crop_dataset
         if not os.path.isdir(dataset):
             os.mkdir(dataset)
         sys.stdout.write("Preparing the face dataset from the raw images.\n")
 
         if not os.path.isdir(raw_data):
-            sys.stderr.write("\tCan not find such directory: {}\n".format(raw_data))
+            sys.stderr.write("\tCan not find source directory: {}\n".format(raw_data))
         if not os.path.isdir(dataset):
-            sys.stdout.write("\tNo exist such director, so will create new directory: {}\n".format(dataset))
+            sys.stdout.write("\tNo exist destination director, so will create new directory: {}\n".format(dataset))
             os.mkdir(dataset)
 
         sys.stdout.write("\tsource:      {}\n".format(raw_data))
@@ -255,12 +246,11 @@ class StandAlone:
                     if image.shape[:2] == (self.face_height, self.face_width):
                         crop = image
                     else:
-                        # cropping the face from the image
-                        # and resizing
+                        # cropping the face from the image and resizing
                         rects = self.dlib_face.detect_face(image)
-                        # find the correct orientation
-                        if len(rects) == 0:
-                            rects, image = self.calib_orie(image)
+
+                        if len(rects) == 0:  # find the correct orientation
+                            rects, image = self.calib_orientation(image)
 
                         if len(rects) != 0:
                             (x, y, w, h) = (rects[0].left(), rects[0].top(), rects[0].right() - rects[0].left(),
@@ -269,7 +259,8 @@ class StandAlone:
                             height, width = image.shape[:2]
 
                             crop = image[max(0, y): min(y + h, height), max(0, x):min(width, x + w)]
-                            crop = cv2.resize(crop, (self.face_width, self.face_height))
+                            if self.stand_flag:
+                                crop = self.standardize_face(crop)
 
                     if crop is not None:
                         cv2.imwrite(filename=os.path.join(new_subdirpath, filename), img=crop)
@@ -458,11 +449,13 @@ if __name__ == '__main__':
     root_dataset = "../dataset"
     st = StandAlone(dataset=root_dataset, model_path=model)
 
-    raw_images_folder = "../dataset/rawdata"
-    st.train_data(raw_data=raw_images_folder)
-    st.ensemble_data()
-    st.train_model()
+    # raw_images_folder = "../dataset/raw_data"
+    # st.train_data(raw_data=raw_images_folder)
+    # st.ensemble_data()
+    # st.train_model()
 
-    check_dataset = "../dataset/crop"
+    check_dataset = "../dataset/train"
     st.check_precision(check_dataset)
     # st.test_image_file()
+
+

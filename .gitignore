@@ -1,7 +1,5 @@
-
 .idea/
 dataset/
 model/
-src/__init__.pyc
-src/face.pyc
+data/
 *.pyc

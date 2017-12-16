@@ -13,6 +13,12 @@ LEFT_EYE_POINTS = list(range(0, 2))
 NUM_TOTAL_POINTS = 5
 
 
+def convert_rect(cv_rect):
+    (x, y, w, h) = cv_rect.astype(dtype=np.long)
+    rect = dlib.rectangle(int(x), int(y), int(x + w), int(y + h))
+    return rect
+
+
 class Face:
     def __init__(self, detect_mode='haar'):
 
@@ -47,18 +53,6 @@ class Face:
             sys.exit(1)
         self.shape_predictor = dlib.shape_predictor(detector_path)
 
-        # init the face descriptor
-        recognizer_path = os.path.join(detector_dir, "dlib_face_recognition_resnet_model_v1.dat")
-        if not os.path.isfile(recognizer_path):
-            sys.stderr.write("no exist shape predictor.\n")
-            sys.exit(1)
-        self.recognizer = dlib.face_recognition_model_v1(recognizer_path)
-
-    def convert_rect(self, cv_rect):
-        (x, y, w, h) = cv_rect.astype(dtype=np.long)
-        rect = dlib.rectangle(int(x), int(y), int(x + w), int(y + h))
-        return rect
-
     def detect_face(self, image):
         if self.detect_mode == 'dlib':
             rects = self.detector(image, 0)
@@ -71,7 +65,7 @@ class Face:
             rects = []
             # convert cv_rect to dlib_rect
             for cv_rect in cv_rects:
-                rect = self.convert_rect(cv_rect)
+                rect = convert_rect(cv_rect)
                 rects.append(rect)
             return rects
 
