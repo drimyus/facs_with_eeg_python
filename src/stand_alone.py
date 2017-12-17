@@ -17,6 +17,9 @@ FACE_DATASET = "crop"
 TRAIN_DATASET = "train"
 TEST_DATASET = "test"
 
+# Change from:
+
+
 
 class StandAlone:
     def __init__(self, dataset, model_path, stand_flag=False):
@@ -42,7 +45,9 @@ class StandAlone:
         self.face_width = 151
         self.face_height = 151
 
-        self.labels = ["angry", "contemp", "disgust", "fear", "happy", "neutral", "sadness", "suprise"]
+        # self.labels = ["angry", "contemp", "disgust", "fear", "happy", "neutral", "sadness", "suprise"]
+        self.labels = ["angry", "disgust", "happy", "neutral", "suprise"]
+
         self.rect_color = (0, 150, 0)
         self.text_color = (255, 255, 0)
 
@@ -321,7 +326,7 @@ class StandAlone:
         # Configure the model : linear SVM model with probability capabilities
         """'linear', 'poly', 'rbf', 'sigmoid', 'precomputed' or  a callable."""
 
-        model = SVC(C=1.0, kernel='poly', degree=3, gamma='auto', coef0=0.0, shrinking=True, probability=True,
+        model = SVC(C=1.0, kernel='linear', degree=3, gamma='auto', coef0=0.0, shrinking=True, probability=True,
                     tol=0.001, cache_size=200, class_weight='balanced', verbose=False, max_iter=-1,
                     decision_function_shape='ovr', random_state=None)
         # model = SVC(C=1.0, kernel='linear')
@@ -504,7 +509,7 @@ class StandAlone:
             if len(self.list_probs) == self.max_sz:
                 del self.list_probs[0]
 
-                avg_probs = np.zeros((1, 8), dtype=np.float64)
+                avg_probs = np.zeros(probs.shape, dtype=np.float64)
                 for past_probs in self.list_probs:
                     avg_probs += past_probs / len(self.list_probs)
 
@@ -530,11 +535,13 @@ if __name__ == '__main__':
     # st.ensemble_data()
     # st.train_model()
 
-    # check_dataset = "../dataset/test";
+    # check_dataset = "../dataset/train"
     # st.check_precision(check_dataset)
-    #
-    # st.test_image_file()
 
     st.live_video("../data/THE FINAL MANUP 20171080P.mp4")
+
+    # st.test_image_file()
+
+
 
 
