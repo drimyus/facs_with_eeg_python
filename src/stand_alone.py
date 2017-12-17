@@ -321,7 +321,7 @@ class StandAlone:
         # Configure the model : linear SVM model with probability capabilities
         """'linear', 'poly', 'rbf', 'sigmoid', 'precomputed' or  a callable."""
 
-        model = SVC(C=1.0, kernel='poly', degree=3, gamma='auto', coef0=0.0, shrinking=True, probability=True,
+        model = SVC(C=1.0, kernel='linear', degree=3, gamma='auto', coef0=0.0, shrinking=True, probability=True,
                     tol=0.001, cache_size=200, class_weight='balanced', verbose=False, max_iter=-1,
                     decision_function_shape='ovr', random_state=None)
         # model = SVC(C=1.0, kernel='linear')
@@ -460,6 +460,7 @@ class StandAlone:
         height = cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
 
         ret, frame = cap.read()
+        pos = 0
 
         while ret:
             ret, frame = cap.read()
@@ -486,7 +487,10 @@ class StandAlone:
                 break
             elif key == ord('n'):
                 cur_pos = cap.get(cv2.CAP_PROP_POS_FRAMES)
-                cap.set(cv2.CAP_PROP_POS_FRAMES, cur_pos + 500)
+                cap.set(cv2.CAP_PROP_POS_FRAMES, cur_pos + 25)
+            elif key == ord('s'):
+                pos += 1
+                cv2.imwrite("result{}.jpg".format(pos), frame)
 
         cap.release()
         cv2.destroyAllWindows()
@@ -504,7 +508,7 @@ class StandAlone:
             if len(self.list_probs) == self.max_sz:
                 del self.list_probs[0]
 
-                avg_probs = np.zeros((1, 8), dtype=np.float64)
+                avg_probs = np.zeros(probs.shape, dtype=np.float64)
                 for past_probs in self.list_probs:
                     avg_probs += past_probs / len(self.list_probs)
 
@@ -530,11 +534,8 @@ if __name__ == '__main__':
     # st.ensemble_data()
     # st.train_model()
 
-    # check_dataset = "../dataset/test";
+    # check_dataset = "../dataset/test"
     # st.check_precision(check_dataset)
-    #
-    # st.test_image_file()
 
     st.live_video("../data/THE FINAL MANUP 20171080P.mp4")
-
-
+    # st.test_image_file()
