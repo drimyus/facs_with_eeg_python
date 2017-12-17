@@ -43,8 +43,8 @@ class StandAlone:
         self.face_height = 151
 
         self.labels = ["angry", "contemp", "disgust", "fear", "happy", "neutral", "sadness", "suprise"]
-        self.rect_color = (0, 255, 0)
-        self.text_color = (255, 0, 255)
+        self.rect_color = (0, 150, 0)
+        self.text_color = (255, 255, 0)
 
         # load the model
         sys.stdout.write("Loading the model.\n")
@@ -53,6 +53,10 @@ class StandAlone:
         # if not success:
         #     # No exist trained model, so training...
         #     self.train_model()
+
+        self.list_probs = []
+        self.max_sz = 10
+        self.init_flag = True
 
     def load(self):
         if os.path.isfile(self.model_path):
@@ -431,10 +435,14 @@ class StandAlone:
 
                     fid, idx, probs = self.classify_description(description)
 
-                    cv2.rectangle(calib_image, (rect.left(), rect.top()), (rect.right(), rect.bottom()), self.rect_color, 3)
-                    cv2.putText(calib_image, fid, (rect.left(), rect.top()), cv2.FONT_HERSHEY_SIMPLEX, 1, self.text_color, 3)
+                    cv2.rectangle(calib_image, (rect.left(), rect.top()), (rect.right(), rect.bottom()),
+                                  self.rect_color, 3)
+                    cv2.putText(calib_image, fid, (rect.left(), rect.top()), cv2.FONT_HERSHEY_SIMPLEX, 1,
+                                self.text_color, 3)
 
-                show_image = cv2.resize(calib_image, (int(max(calib_image.shape[1] / 4, 130)), int(max(calib_image.shape[0] / 4, 150))))
+                show_image = cv2.resize(calib_image,
+                                        (int(max(calib_image.shape[1] / 4, 130)), int(max(calib_image.shape[0] / 4, 150))))
+
                 cv2.imshow(image_path[-20:], show_image)
 
                 sys.stdout.write("[{}]    id: {}\n".format(fid, str(idx)))
@@ -451,38 +459,29 @@ class StandAlone:
         width = cap.get(cv2.CAP_PROP_FRAME_WIDTH)
         height = cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
 
-
-
         ret, frame = cap.read()
+
         while ret:
             ret, frame = cap.read()
-
             frame = cv2.resize(frame, (int(width/2.5), int(height/2.5)))
-
             rects = self.dlib_face.detect_face(frame)
-
-            for rect in rects:
+            rect, probs = None, None
+            if len(rects) != 0:
+                rect = rects[0]
                 crop = frame[max(0, rect.top()): max(frame.shape[0], rect.bottom()),
                              max(rect.left(), 0):min(rect.right(), frame.shape[1])]
                 if self.stand_flag:
                     stand_face = self.standardize_face(crop)
                 else:
                     stand_face = crop
-
                 resize = cv2.resize(stand_face, (self.face_width, self.face_height))
-
                 description = self.dlib_face.recog_description(resize)
-
                 fid, idx, probs = self.classify_description(description)
 
-                frame = self.show_result(frame, rect, probs)
+            frame = self.show_result(frame, rect, probs)
 
             cv2.imshow("frame", frame)
-
-            cur_pos = cap.get(cv2.CAP_PROP_POS_FRAMES)
-            cap.set(cv2.CAP_PROP_POS_FRAMES, cur_pos + 250)
-
-            key = cv2.waitKey(5000)
+            key = cv2.waitKey(1)
             if key == ord('q'):
                 break
             elif key == ord('n'):
@@ -492,22 +491,31 @@ class StandAlone:
         cap.release()
         cv2.destroyAllWindows()
 
-    def show_result(self, image, rect, probs):
+    def show_result(self, image, rect=None, probs=None):
+        if rect is not None:
+            # show face rectangle
+            cv2.rectangle(image, (rect.left(), rect.top()), (rect.right(), rect.bottom()), self.rect_color, 1)
+            cv2.circle(image, (rect.left(), rect.top()), 1, self.rect_color, -1)
+            cv2.circle(image, (rect.left(), rect.bottom()), 1, self.rect_color, -1)
+            cv2.circle(image, (rect.right(), rect.top()), 1, self.rect_color, -1)
+            cv2.circle(image, (rect.right(), rect.bottom()), 1, self.rect_color, -1)
 
-        cv2.rectangle(image, (rect.left(), rect.top()), (rect.right(), rect.bottom()), self.rect_color, 1)
-        cv2.circle(image, (rect.left(), rect.top()), 1, self.rect_color, -1)
-        cv2.circle(image, (rect.left(), rect.bottom()), 1, self.rect_color, -1)
-        cv2.circle(image, (rect.right(), rect.top()), 1, self.rect_color, -1)
-        cv2.circle(image, (rect.right(), rect.bottom()), 1, self.rect_color, -1)
+            self.list_probs.append(probs)
+            if len(self.list_probs) == self.max_sz:
+                del self.list_probs[0]
 
-        sum = 0.0
-        for i in range(len(probs[0])):
-            cv2.putText(image, "{:}:{:1.2f}".format(self.labels[i], probs[0][i]), (0, 10 + 20 * i),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, self.text_color, 2)
-            cv2.line(image, (100, 10 + 20 * i), (int(100 + probs[0][i] * 200), 10 + 20 * i), self.text_color, 3)
-            sum += probs[0][i]
+                avg_probs = np.zeros((1, 8), dtype=np.float64)
+                for past_probs in self.list_probs:
+                    avg_probs += past_probs / len(self.list_probs)
 
-        print sum
+                for i in range(len(avg_probs[0])):
+                    cv2.putText(image, "{:}:{:1.2f}".format(self.labels[i], avg_probs[0][i]), (0, 10 + 20 * i),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, self.text_color, 2)
+                    cv2.line(image, (100, 10 + 20 * i), (int(110 + avg_probs[0][i] * 200), 10 + 20 * i),
+                             self.text_color, 3)
+        else:
+            self.list_probs = []
+
         return image
 
 
